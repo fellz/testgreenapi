@@ -1,0 +1,119 @@
+import { describe, expect, it } from 'vitest'
+import { parseNotification, type ChatEvent } from '../api/notifications'
+import { normalizePhone } from '../api/phone'
+import { chatsReducer, emptyState, type ChatsState } from './chats'
+
+const incoming = (id: string, text: string, chatId = '100', chatName = 'Вася'): ChatEvent => ({
+  kind: 'message',
+  chatId,
+  chatName,
+  message: { id, text, direction: 'in', timestamp: 1 },
+})
+
+describe('parseNotification', () => {
+  it('входящее текстовое (пример из доки ReceiveNotification)', () => {
+    const ev = parseNotification({
+      typeWebhook: 'incomingMessageReceived',
+      instanceData: { idInstance: 410000001, wid: '79876543210@c.us', typeInstance: 'telegram' },
+      timestamp: 1763115112,
+      idMessage: '126543123451133331119',
+      senderData: { chatId: '10000000', chatName: 'Vasilisa', sender: '10000000', senderName: 'Vasilisa the Wise' },
+      messageData: { typeMessage: 'textMessage', textMessageData: { textMessage: 'Hello from Green-API!' } },
+    })
+    expect(ev).toEqual({
+      kind: 'message',
+      chatId: '10000000',
+      chatName: 'Vasilisa',
+      message: { id: '126543123451133331119', text: 'Hello from Green-API!', direction: 'in', timestamp: 1763115112 },
+    })
+  })
+
+  it('extendedTextMessage и исходящее с телефона', () => {
+    const ev = parseNotification({
+      typeWebhook: 'outgoingMessageReceived',
+      timestamp: 5,
+      idMessage: 'X',
+      senderData: { chatId: '42' },
+      messageData: { typeMessage: 'extendedTextMessage', extendedTextMessageData: { text: 'https://x.ru' } },
+    })
+    expect(ev).toMatchObject({ chatId: '42', message: { direction: 'out', text: 'https://x.ru', status: 'sent' } })
+  })
+
+  it('медиа, стейт и мусор игнорируются', () => {
+    expect(parseNotification({ typeWebhook: 'stateInstanceChanged', stateInstance: 'authorized' })).toBeNull()
+    expect(
+      parseNotification({
+        typeWebhook: 'incomingMessageReceived',
+        idMessage: '1',
+        senderData: { chatId: '1' },
+        messageData: { typeMessage: 'imageMessage' },
+      }),
+    ).toBeNull()
+    expect(parseNotification(null)).toBeNull()
+  })
+
+  it('статус исходящего', () => {
+    expect(
+      parseNotification({ typeWebhook: 'outgoingMessageStatus', chatId: '42', idMessage: 'M', status: 'read' }),
+    ).toEqual({ kind: 'status', chatId: '42', id: 'M', status: 'read' })
+  })
+})
+
+describe('chatsReducer', () => {
+  const opened = chatsReducer(emptyState, { type: 'open', id: '100', title: '+7 999 111-22-33', phone: '79991112233' })
+
+  it('входящее от незнакомого создаёт чат с непрочитанным', () => {
+    const s = chatsReducer(emptyState, { type: 'event', event: incoming('a', 'привет', '200', 'Петя') })
+    expect(s.order).toEqual(['200'])
+    expect(s.chats['200']).toMatchObject({ title: 'Петя', unread: 1 })
+  })
+
+  it('в открытом чате непрочитанные не копятся, имя заменяет номер', () => {
+    const s = chatsReducer(opened, { type: 'event', event: incoming('a', 'привет') })
+    expect(s.chats['100']).toMatchObject({ title: 'Вася', unread: 0 })
+  })
+
+  it('дубликат уведомления не добавляет сообщение', () => {
+    let s = chatsReducer(opened, { type: 'event', event: incoming('a', 'привет') })
+    s = chatsReducer(s, { type: 'event', event: incoming('a', 'привет') })
+    expect(s.chats['100'].messages).toHaveLength(1)
+  })
+
+  it('отправка: pending → id сервера; эхо API не дублирует', () => {
+    let s: ChatsState = chatsReducer(opened, { type: 'sendStart', chatId: '100', tempId: 't1', text: 'hi', now: 0 })
+    expect(s.chats['100'].messages[0]).toMatchObject({ id: 't1', status: 'pending' })
+    s = chatsReducer(s, { type: 'sendDone', chatId: '100', tempId: 't1', id: 'srv' })
+    s = chatsReducer(s, {
+      type: 'event',
+      event: { kind: 'message', chatId: '100', message: { id: 'srv', text: 'hi', direction: 'out', timestamp: 0, status: 'sent' } },
+    })
+    expect(s.chats['100'].messages).toEqual([{ id: 'srv', text: 'hi', direction: 'out', timestamp: 0, status: 'sent' }])
+  })
+
+  it('эхо раньше ответа sendMessage — временное сообщение убирается', () => {
+    let s = chatsReducer(opened, { type: 'sendStart', chatId: '100', tempId: 't1', text: 'hi', now: 0 })
+    s = chatsReducer(s, {
+      type: 'event',
+      event: { kind: 'message', chatId: '100', message: { id: 'srv', text: 'hi', direction: 'out', timestamp: 0, status: 'sent' } },
+    })
+    s = chatsReducer(s, { type: 'sendDone', chatId: '100', tempId: 't1', id: 'srv' })
+    expect(s.chats['100'].messages.map((m) => m.id)).toEqual(['srv'])
+  })
+
+  it('статус не понижается', () => {
+    let s = chatsReducer(opened, { type: 'sendStart', chatId: '100', tempId: 't', text: 'x', now: 0 })
+    s = chatsReducer(s, { type: 'sendDone', chatId: '100', tempId: 't', id: 'm' })
+    s = chatsReducer(s, { type: 'event', event: { kind: 'status', chatId: '100', id: 'm', status: 'read' } })
+    s = chatsReducer(s, { type: 'event', event: { kind: 'status', chatId: '100', id: 'm', status: 'delivered' } })
+    expect(s.chats['100'].messages[0].status).toBe('read')
+  })
+})
+
+describe('normalizePhone', () => {
+  it.each([
+    ['+7 (999) 123-45-67', '79991234567'],
+    ['8 999 123 45 67', '79991234567'],
+    ['+375 29 123 45 67', '375291234567'],
+    ['123', null],
+  ])('%s → %s', (input, out) => expect(normalizePhone(input)).toBe(out))
+})

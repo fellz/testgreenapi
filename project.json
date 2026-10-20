@@ -1,0 +1,16 @@
+{
+  "kind": "dashboard-project",
+  "id": "testgreenapi",
+  "name": "testgreenapi",
+  "category": "personal",
+  "accent": "#2C6BFF",
+  "note": "Тестовое GREEN-API: React-чат для Telegram через GREEN-API (SendMessage + HTTP API ReceiveNotification). Запуск ./ctl.sh start; прод — testgreenapi.riakovlev.ru (статика).",
+  "control": { "run": "./ctl.sh" },
+  "services": [
+    { "name": "prod", "desc": "статика · задеплоено", "role": "site", "location": "host", "check": "https://testgreenapi.riakovlev.ru/" },
+    { "name": "UI", "desc": "react/vite", "role": "web", "location": "local", "port": 5216, "subdomain": "testgreenapi" }
+  ],
+  "reservedPorts": [
+    { "port": 5217, "location": "local", "desc": "vite preview для e2e playwright (ephemeral)" }
+  ]
+}
