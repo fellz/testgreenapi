@@ -52,6 +52,23 @@ describe('parseNotification', () => {
     expect(parseNotification(null)).toBeNull()
   })
 
+  it('входящее в группе получает автора, в личном — нет', () => {
+    const msg = (senderData: object) =>
+      parseNotification({
+        typeWebhook: 'incomingMessageReceived',
+        idMessage: '1',
+        timestamp: 1,
+        senderData,
+        messageData: { typeMessage: 'textMessage', textMessageData: { textMessage: 'hi' } },
+      })
+    expect(msg({ chatId: '-100500', chatType: 'group', chatName: 'Фронтенд', sender: '7', senderName: 'Дима' })).toMatchObject({
+      chatName: 'Фронтенд',
+      message: { author: 'Дима' },
+    })
+    const direct = msg({ chatId: '7', chatType: 'user', sender: '7', senderName: 'Дима' })
+    expect(direct?.kind === 'message' && direct.message).not.toHaveProperty('author')
+  })
+
   it('статус исходящего', () => {
     expect(
       parseNotification({ typeWebhook: 'outgoingMessageStatus', chatId: '42', idMessage: 'M', status: 'read' }),

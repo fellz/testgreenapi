@@ -8,6 +8,7 @@ export type Message = {
   id: string
   text: string
   direction: 'in' | 'out'
+  author?: string // автор входящего в группе; в личном чате не нужен
   timestamp: number // unix, секунды
   status?: MessageStatus
 }
@@ -45,14 +46,17 @@ export function parseNotification(body: unknown): ChatEvent | null {
       const text = textOf(b.messageData)
       if (!chatId || text == null || !b.idMessage) return null
       const incoming = b.typeWebhook === 'incomingMessageReceived'
+      const sd = b.senderData
+      const group = sd.chatType === 'group' || String(chatId).startsWith('-')
       return {
         kind: 'message',
         chatId: String(chatId),
-        chatName: incoming ? b.senderData?.chatName || b.senderData?.senderName || undefined : undefined,
+        chatName: incoming ? sd.chatName || sd.senderName || undefined : undefined,
         message: {
           id: String(b.idMessage),
           text,
           direction: incoming ? 'in' : 'out',
+          ...(incoming && group && { author: sd.senderContactName || sd.senderName || String(sd.sender ?? '') }),
           timestamp: Number(b.timestamp) || Math.floor(Date.now() / 1000),
           status: incoming ? undefined : 'sent',
         },

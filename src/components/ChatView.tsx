@@ -59,9 +59,14 @@ export function ChatView({ chat, onSend, onBack }: Props) {
 
       <div className="chat__messages" ref={listRef} data-testid="messages">
         {chat.messages.length === 0 && <div className="chat__empty">Напишите первое сообщение</div>}
-        {chat.messages.map((m) => (
+        {chat.messages.map((m, i) => (
           <div key={m.id} className={`msg msg--${m.direction}`} data-direction={m.direction}>
             <div className="msg__bubble">
+              {m.author && chat.messages[i - 1]?.author !== m.author && (
+                <span className="msg__author" style={{ color: authorColor(m.author) }}>
+                  {m.author}
+                </span>
+              )}
               <span className="msg__text">{m.text}</span>
               <span className="msg__meta">
                 {formatClock(m.timestamp)}
@@ -91,6 +96,14 @@ export function ChatView({ chat, onSend, onBack }: Props) {
       </form>
     </section>
   )
+}
+
+// Стабильный цвет имени автора в группе, как в мессенджерах
+const AUTHOR_COLORS = ['#e2574c', '#2c6bff', '#8a3dff', '#1a9e6e', '#d9822b', '#c2399a']
+function authorColor(name: string) {
+  let h = 0
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return AUTHOR_COLORS[h % AUTHOR_COLORS.length]
 }
 
 function StatusIcon({ status }: { status?: MessageStatus }) {

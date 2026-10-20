@@ -102,9 +102,19 @@ try {
   check('очередь уведомлений разобрана', queue.length === 0, `осталось ${queue.length}`)
   await page.screenshot({ path: SHOTS + '2-chat.png' })
 
+  // 4b. группа: у входящего видно автора, подряд от одного автора — имя один раз
+  const grp = (id, name, text) => push({ typeWebhook: 'incomingMessageReceived', timestamp: ts(), idMessage: id, senderData: { chatId: '-100777', chatType: 'group', chatName: 'Фронтенд-чат', sender: name, senderName: name }, messageData: { typeMessage: 'textMessage', textMessageData: { textMessage: text } } })
+  grp('g1', 'Дима', 'Всем привет'); grp('g2', 'Дима', 'Кто на созвоне?'); grp('g3', 'Аня', 'Я')
+  await page.click('.chat-item:has-text("Фронтенд-чат")')
+  await page.waitForFunction(() => document.querySelectorAll('.msg--in').length === 3)
+  const authors = await page.locator('.msg__author').allTextContents()
+  check('в группе показан автор, без повтора подряд', JSON.stringify(authors) === JSON.stringify(['Дима', 'Аня']), JSON.stringify(authors))
+  await page.screenshot({ path: SHOTS + '4-group.png' })
+  await page.click('.chat-item:has-text("Василий")')
+
   // 5. перезагрузка сохраняет сессию и переписку
   await page.reload()
-  await page.click('.chat-item')
+  await page.click('.chat-item:has-text("Василий")')
   check('после reload переписка на месте', (await page.locator('.msg').count()) === 2)
 
   // 6. мобильная раскладка
