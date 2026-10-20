@@ -54,7 +54,7 @@ describe('parseNotification', () => {
     expect(parseNotification(null)).toBeNull()
   })
 
-  it('входящее в группе получает автора, в личном — нет', () => {
+  it('группа распознаётся по chatType group/channel и по отрицательному id', () => {
     const msg = (senderData: object) =>
       parseNotification({
         typeWebhook: 'incomingMessageReceived',
@@ -63,12 +63,10 @@ describe('parseNotification', () => {
         senderData,
         messageData: { typeMessage: 'textMessage', textMessageData: { textMessage: 'hi' } },
       })
-    expect(msg({ chatId: '-100500', chatType: 'group', chatName: 'Фронтенд', sender: '7', senderName: 'Дима' })).toMatchObject({
-      chatName: 'Фронтенд',
-      message: { author: 'Дима' },
-    })
-    const direct = msg({ chatId: '7', chatType: 'user', sender: '7', senderName: 'Дима' })
-    expect(direct?.kind === 'message' && direct.message).not.toHaveProperty('author')
+    expect(msg({ chatId: '-100500', chatType: 'group' })).toMatchObject({ group: true })
+    expect(msg({ chatId: '-100500', chatType: 'channel' })).toMatchObject({ group: true })
+    expect(msg({ chatId: '-100500' })).toMatchObject({ group: true })
+    expect(msg({ chatId: '7', chatType: 'user' })).toMatchObject({ group: false })
   })
 
   it('статус исходящего', () => {

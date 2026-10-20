@@ -8,7 +8,6 @@ export type Message = {
   id: string
   text: string
   direction: 'in' | 'out'
-  author?: string // автор входящего в группе; в личном чате не нужен
   timestamp: number // unix, секунды
   status?: MessageStatus
   edited?: boolean
@@ -77,7 +76,6 @@ export function parseNotification(body: unknown): ChatEvent | null {
           id: String(b.idMessage),
           text,
           direction: incoming ? 'in' : 'out',
-          ...(incoming && group && { author: sd.senderContactName || sd.senderName || String(sd.sender ?? '') }),
           timestamp: Number(b.timestamp) || Math.floor(Date.now() / 1000),
           status: incoming ? undefined : 'sent',
         },
