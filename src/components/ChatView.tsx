@@ -101,12 +101,13 @@ export function ChatView({ chat, onSend, onBack }: Props) {
 function StatusIcon({ status }: { status?: MessageStatus }) {
   if (status === 'failed') return <span className="msg__status msg__status--failed" title="Не отправлено">!</span>
   if (status === 'pending') return <span className="msg__status" title="Отправляется">🕓</span>
-  const double = status === 'delivered' || status === 'read'
+  // Галочки по-телеграмному: «доставлено» там не показывают — одна галочка, пока не прочитано
+  const read = status === 'read'
   return (
-    <span className={status === 'read' ? 'msg__status msg__status--read' : 'msg__status'} title={status}>
+    <span className={read ? 'msg__status msg__status--read' : 'msg__status'} title={read ? 'Прочитано' : 'Отправлено'}>
       <svg viewBox="0 0 18 12" width="16" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <path d="M1 6.5 4.5 10 11 2" />
-        {double && <path d="M7.5 9.5 8 10l6.5-8" />}
+        {read && <path d="M7.5 9.5 8 10l6.5-8" />}
       </svg>
     </span>
   )
