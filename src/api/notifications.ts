@@ -16,7 +16,7 @@ export type Message = {
 }
 
 export type ChatEvent =
-  | { kind: 'message'; chatId: string; chatName?: string; message: Message }
+  | { kind: 'message'; chatId: string; chatName?: string; group: boolean; message: Message }
   | { kind: 'status'; chatId: string; id: string; status: MessageStatus }
   | { kind: 'edit'; chatId: string; id: string; text: string }
   | { kind: 'delete'; chatId: string; id: string }
@@ -72,6 +72,7 @@ export function parseNotification(body: unknown): ChatEvent | null {
         kind: 'message',
         chatId: String(chatId),
         chatName: incoming ? sd.chatName || sd.senderName || undefined : undefined,
+        group,
         message: {
           id: String(b.idMessage),
           text,

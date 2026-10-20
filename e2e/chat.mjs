@@ -111,28 +111,27 @@ try {
   check('очередь уведомлений разобрана', queue.length === 0, `осталось ${queue.length}`)
   await page.screenshot({ path: SHOTS + '2-chat.png' })
 
-  // 4b. группа: у входящего видно автора, подряд от одного автора — имя один раз
-  const grp = (id, name, text) => push({ typeWebhook: 'incomingMessageReceived', timestamp: ts(), idMessage: id, senderData: { chatId: '-100777', chatType: 'group', chatName: 'Фронтенд-чат', sender: name, senderName: name }, messageData: { typeMessage: 'textMessage', textMessageData: { textMessage: text } } })
-  grp('g1', 'Дима', 'Всем привет'); grp('g2', 'Дима', 'Кто на созвоне?'); grp('g3', 'Аня', 'Я')
-  await page.click('.chat-item:has-text("Фронтенд-чат")')
-  await page.waitForFunction(() => document.querySelectorAll('.msg--in').length === 3)
-  const authors = await page.locator('.msg__author').allTextContents()
-  check('в группе показан автор, без повтора подряд', JSON.stringify(authors) === JSON.stringify(['Дима', 'Аня']), JSON.stringify(authors))
+  // 4b. поток из группы, в которой состоит аккаунт, не засоряет список чатов
+  push({ typeWebhook: 'incomingMessageReceived', timestamp: ts(), idMessage: 'g1', senderData: { chatId: '-100777', chatType: 'group', chatName: 'Фронтенд-чат', sender: '9', senderName: 'Дима' }, messageData: { typeMessage: 'textMessage', textMessageData: { textMessage: 'флуд' } } })
+  await new Promise((r) => { const t = setInterval(() => queue.length === 0 && (clearInterval(t), r()), 50) })
+  check('сообщение из группы не создало чат', (await page.locator('.chat-item').count()) === 1 && queue.length === 0)
+
   // 4c. правка и удаление: stanzaId указывает на исходное сообщение
-  const edit = (typeMessage, data) => push({ typeWebhook: 'incomingMessageReceived', timestamp: ts(), idMessage: `e-${receipt}`, senderData: { chatId: '-100777', chatType: 'group', sender: 'Дима', senderName: 'Дима' }, messageData: { typeMessage, ...data } })
-  edit('editedMessage', { editedMessageData: { stanzaId: 'g2', textMessage: 'Кто на созвоне в 15:00?' } })
-  edit('deletedMessage', { deletedMessageData: { stanzaId: 'g3' } })
+  const vasya = (idMessage, messageData) => push({ typeWebhook: 'incomingMessageReceived', timestamp: ts(), idMessage, senderData: { chatId: '555', chatType: 'user', chatName: 'Василий', senderName: 'Василий' }, messageData })
+  vasya('v1', { typeMessage: 'textMessage', textMessageData: { textMessage: 'Созвон в 15?' } })
+  vasya('v2', { typeMessage: 'textMessage', textMessageData: { textMessage: 'Ой, не тот чат' } })
+  vasya('e1', { typeMessage: 'editedMessage', editedMessageData: { stanzaId: 'v1', textMessage: 'Созвон в 16:00?' } })
+  vasya('e2', { typeMessage: 'deletedMessage', deletedMessageData: { stanzaId: 'v2' } })
   await page.waitForSelector('.msg__text--deleted')
   const texts = await page.locator('.msg--in .msg__text').allTextContents()
-  check('правка обновила текст, удалённое осталось с пометкой', JSON.stringify(texts) === JSON.stringify(['Всем привет', 'Кто на созвоне в 15:00?', 'Сообщение удалено']), JSON.stringify(texts))
+  check('правка обновила текст, удалённое осталось с пометкой', JSON.stringify(texts) === JSON.stringify(['Привет! Получил 👍', 'Созвон в 16:00?', 'Сообщение удалено']), JSON.stringify(texts))
   check('у отредактированного пометка «изменено»', (await page.locator('.msg--in').nth(1).locator('.msg__meta').textContent()).includes('изменено'))
-  await page.screenshot({ path: SHOTS + '4-group.png' })
-  await page.click('.chat-item:has-text("Василий")')
+  await page.screenshot({ path: SHOTS + '4-edit.png' })
 
   // 5. перезагрузка сохраняет сессию и переписку
   await page.reload()
   await page.click('.chat-item:has-text("Василий")')
-  check('после reload переписка на месте', (await page.locator('.msg').count()) === 2)
+  check('после reload переписка на месте', (await page.locator('.msg').count()) === 4)
 
   // 6. мобильная раскладка
   await page.setViewportSize({ width: 390, height: 800 })

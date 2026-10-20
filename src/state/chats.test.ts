@@ -7,6 +7,7 @@ const incoming = (id: string, text: string, chatId = '100', chatName = 'Вася
   kind: 'message',
   chatId,
   chatName,
+  group: false,
   message: { id, text, direction: 'in', timestamp: 1 },
 })
 
@@ -24,6 +25,7 @@ describe('parseNotification', () => {
       kind: 'message',
       chatId: '10000000',
       chatName: 'Vasilisa',
+      group: false,
       message: { id: '126543123451133331119', text: 'Hello from Green-API!', direction: 'in', timestamp: 1763115112 },
     })
   })
@@ -85,6 +87,13 @@ describe('chatsReducer', () => {
     expect(s.chats['200']).toMatchObject({ title: 'Петя', unread: 1 })
   })
 
+  it('сообщение из незнакомой группы чат не создаёт, в уже открытую — добавляется', () => {
+    const fromGroup = { ...incoming('g', 'флуд', '-100500', 'Группа'), group: true } as ChatEvent
+    expect(chatsReducer(emptyState, { type: 'event', event: fromGroup })).toBe(emptyState)
+    const open = chatsReducer(emptyState, { type: 'open', id: '-100500', title: 'Группа' })
+    expect(chatsReducer(open, { type: 'event', event: fromGroup }).chats['-100500'].messages).toHaveLength(1)
+  })
+
   it('в открытом чате непрочитанные не копятся, имя заменяет номер', () => {
     const s = chatsReducer(opened, { type: 'event', event: incoming('a', 'привет') })
     expect(s.chats['100']).toMatchObject({ title: 'Вася', unread: 0 })
@@ -102,7 +111,7 @@ describe('chatsReducer', () => {
     s = chatsReducer(s, { type: 'sendDone', chatId: '100', tempId: 't1', id: 'srv' })
     s = chatsReducer(s, {
       type: 'event',
-      event: { kind: 'message', chatId: '100', message: { id: 'srv', text: 'hi', direction: 'out', timestamp: 0, status: 'sent' } },
+      event: { kind: 'message', chatId: '100', group: false, message: { id: 'srv', text: 'hi', direction: 'out', timestamp: 0, status: 'sent' } },
     })
     expect(s.chats['100'].messages).toEqual([{ id: 'srv', text: 'hi', direction: 'out', timestamp: 0, status: 'sent' }])
   })
@@ -111,7 +120,7 @@ describe('chatsReducer', () => {
     let s = chatsReducer(opened, { type: 'sendStart', chatId: '100', tempId: 't1', text: 'hi', now: 0 })
     s = chatsReducer(s, {
       type: 'event',
-      event: { kind: 'message', chatId: '100', message: { id: 'srv', text: 'hi', direction: 'out', timestamp: 0, status: 'sent' } },
+      event: { kind: 'message', chatId: '100', group: false, message: { id: 'srv', text: 'hi', direction: 'out', timestamp: 0, status: 'sent' } },
     })
     s = chatsReducer(s, { type: 'sendDone', chatId: '100', tempId: 't1', id: 'srv' })
     expect(s.chats['100'].messages.map((m) => m.id)).toEqual(['srv'])

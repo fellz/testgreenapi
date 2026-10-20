@@ -84,6 +84,9 @@ export function chatsReducer(state: ChatsState, action: ChatsAction): ChatsState
         return withChat(state, { ...existing, messages })
       }
 
+      // сам по себе чат появляется только для личной переписки: аккаунт может состоять в десятках
+      // групп, и их поток забил бы список. Уже открытый групповой чат продолжает обновляться.
+      if (!existing && ev.group) return state
       const chat = existing ?? newChat(ev.chatId)
       // первое входящее с именем заменяет заголовок-номер на имя собеседника
       const rename = !chat.named && !!ev.chatName
