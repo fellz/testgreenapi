@@ -7,7 +7,7 @@ const { chromium } = createRequire(import.meta.url)('playwright')
 
 const BASE = process.env.BASE_URL ?? 'http://127.0.0.1:5217'
 const ID = '1101000001'
-const API = 'https://1101.api.greenapi.com'
+const API = 'https://1101.api.green-api.com'
 const SHOTS = new URL('./shots/', import.meta.url).pathname
 mkdirSync(SHOTS, { recursive: true })
 

@@ -22,11 +22,11 @@ export class GreenApiError extends Error {
   }
 }
 
-// В консоли apiUrl указан явно, но у всех инстансов он вида https://NNNN.api.greenapi.com,
+// В консоли apiUrl указан явно; обычно он вида https://NNNN.api.green-api.com (проверено на 4100 и 7103),
 // где NNNN — первые 4 цифры idInstance. Даём его подставиться сам, поле остаётся редактируемым.
 export function defaultApiUrl(idInstance: string): string {
   const prefix = idInstance.trim().slice(0, 4)
-  return /^\d{4}$/.test(prefix) ? `https://${prefix}.api.greenapi.com` : ''
+  return /^\d{4}$/.test(prefix) ? `https://${prefix}.api.green-api.com` : ''
 }
 
 export function createClient(creds: Credentials) {

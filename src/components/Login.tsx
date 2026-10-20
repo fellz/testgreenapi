@@ -83,7 +83,7 @@ export function Login({ onLogin }: Props) {
               setApiUrlTouched(true)
               setApiUrl(e.target.value)
             }}
-            placeholder="https://1101.api.greenapi.com"
+            placeholder="https://1101.api.green-api.com"
           />
         </label>
 
