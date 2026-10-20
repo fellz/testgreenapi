@@ -26,7 +26,9 @@ async function mockApi(route) {
 
   switch (method) {
     case 'getStateInstance':
-      return json({ stateInstance: 'authorized' })
+      return url.pathname.endsWith('/bad-token')
+        ? route.fulfill({ status: 401, body: 'Unauthorized', headers: { 'Access-Control-Allow-Origin': '*' } })
+        : json({ stateInstance: 'authorized' })
     case 'checkAccount':
       return json(body.phoneNumber === 79991234567 ? { exist: true, chatId: '555', username: '@vasya' } : { exist: false, chatId: '' })
     case 'sendMessage': {
@@ -63,9 +65,15 @@ try {
   await page.route(`${API}/**`, mockApi)
   await page.goto(BASE)
 
-  // 1. вход: apiUrl подставляется из idInstance
+  // 1. вход: apiUrl-подсказка выводится из idInstance, пустое поле = подсказка
   await page.fill('input[name=idInstance]', ID)
-  check('apiUrl выведен из idInstance', (await page.inputValue('input[name=apiUrl]')) === API)
+  check('apiUrl выведен из idInstance', (await page.getAttribute('input[name=apiUrl]', 'placeholder')) === API)
+  // неверный токен: ошибка, а введённое не стирается сбросом формы после action
+  await page.fill('input[name=apiTokenInstance]', 'bad-token')
+  await page.click('button:has-text("Войти")')
+  await page.waitForSelector('.login .error')
+  check('неверный токен → ошибка 401', (await page.textContent('.login .error')).includes('Неверный'))
+  check('после ошибки поля не стёрлись', (await page.inputValue('input[name=apiTokenInstance]')) === 'bad-token' && (await page.inputValue('input[name=idInstance]')) === ID)
   await page.fill('input[name=apiTokenInstance]', 'secret-token')
   await page.screenshot({ path: SHOTS + '1-login.png' })
   await page.click('button:has-text("Войти")')
@@ -77,6 +85,7 @@ try {
   await page.fill('input[name=phone]', '+7 000 000-00-00')
   await page.click('button:has-text("Создать чат")')
   check('номер без Telegram → ошибка', await page.locator('.new-chat .error').waitFor().then(() => true, () => false))
+  check('номер после ошибки остался в поле', (await page.inputValue('input[name=phone]')) === '+7 000 000-00-00')
   await page.fill('input[name=phone]', '8 (999) 123-45-67')
   await page.click('button:has-text("Создать чат")')
   await page.waitForSelector('.chat__title')

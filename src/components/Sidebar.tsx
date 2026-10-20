@@ -1,4 +1,4 @@
-import { useState, type SubmitEvent } from 'react'
+import { useActionState, useState } from 'react'
 import type { GreenApiClient } from '../api/greenApi'
 import { formatPhone, normalizePhone } from '../api/phone'
 import type { ChatsState } from '../state/chats'
@@ -96,50 +96,39 @@ function NewChat({
   onCreated: (id: string, title: string, phone: string) => void
   onCancel: () => void
 }) {
-  const [phone, setPhone] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  async function submit(e: SubmitEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const digits = normalizePhone(phone)
-    if (!digits) {
-      setError('Введите номер в международном формате, например +7 999 123-45-67')
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      // Telegram адресует чаты по chatId, а не по номеру — получаем его через CheckAccount
-      const res = await client.checkAccount(Number(digits))
-      if (res.exist && res.chatId) onCreated(res.chatId, formatPhone(digits), digits)
-      else setError(res.reason ?? 'У номера нет Telegram или он скрыт настройками приватности')
-    } catch {
-      setError('Не удалось проверить номер. Попробуйте ещё раз.')
-    } finally {
-      setBusy(false)
-    }
-  }
+  // phone возвращаем в state: после action React сбрасывает поле к defaultValue
+  const [state, action, pending] = useActionState(
+    async (_: { error: string | null; phone: string }, form: FormData) => {
+      const phone = String(form.get('phone') ?? '')
+      const digits = normalizePhone(phone)
+      if (!digits) return { error: 'Введите номер в международном формате, например +7 999 123-45-67', phone }
+      try {
+        // Telegram адресует чаты по chatId, а не по номеру — получаем его через CheckAccount
+        const res = await client.checkAccount(Number(digits))
+        if (res.exist && res.chatId) {
+          onCreated(res.chatId, formatPhone(digits), digits)
+          return { error: null, phone: '' }
+        }
+        return { error: res.reason ?? 'У номера нет Telegram или он скрыт настройками приватности', phone }
+      } catch {
+        return { error: 'Не удалось проверить номер. Попробуйте ещё раз.', phone }
+      }
+    },
+    { error: null, phone: '' },
+  )
 
   return (
-    <form className="new-chat" onSubmit={submit}>
-      <input
-        name="phone"
-        type="tel"
-        value={phone}
-        onChange={(e) => setPhone(e.target.value)}
-        placeholder="Номер телефона получателя"
-        autoFocus
-      />
+    <form className="new-chat" action={action}>
+      <input name="phone" type="tel" defaultValue={state.phone} placeholder="Номер телефона получателя" autoFocus />
       <div className="new-chat__actions">
         <button type="button" className="btn" onClick={onCancel}>
           Отмена
         </button>
-        <button className="btn btn--primary" disabled={busy}>
-          {busy ? 'Ищу…' : 'Создать чат'}
+        <button className="btn btn--primary" disabled={pending}>
+          {pending ? 'Ищу…' : 'Создать чат'}
         </button>
       </div>
-      {error && <div className="error" role="alert">{error}</div>}
+      {state.error && <div className="error" role="alert">{state.error}</div>}
     </form>
   )
 }

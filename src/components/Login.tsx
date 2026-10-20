@@ -1,52 +1,47 @@
-import { useState, type SubmitEvent } from 'react'
+import { useActionState, useState } from 'react'
 import { createClient, defaultApiUrl, GreenApiError, type Credentials } from '../api/greenApi'
 
 type Props = { onLogin: (creds: Credentials) => void }
 
+// Результат попытки входа: ошибка + введённые значения. React 19 после action сбрасывает
+// неуправляемые поля формы к defaultValue — отдаём их обратно, чтобы при ошибке ничего не стёрлось.
+type State = { error: string | null; values: Partial<Credentials> }
+
 export function Login({ onLogin }: Props) {
+  // единственное управляемое поле — от него зависит подсказка apiUrl
   const [idInstance, setIdInstance] = useState('')
-  const [apiTokenInstance, setToken] = useState('')
-  const [apiUrl, setApiUrl] = useState('')
-  const [apiUrlTouched, setApiUrlTouched] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
 
-  const effectiveApiUrl = apiUrlTouched ? apiUrl : defaultApiUrl(idInstance)
-
-  async function submit(e: SubmitEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const creds: Credentials = {
-      idInstance: idInstance.trim(),
-      apiTokenInstance: apiTokenInstance.trim(),
-      apiUrl: effectiveApiUrl.trim(),
-    }
-    if (!creds.idInstance || !creds.apiTokenInstance || !creds.apiUrl) {
-      setError('Заполните все поля')
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      const { stateInstance } = await createClient(creds).getStateInstance()
-      if (stateInstance !== 'authorized') {
-        setError(`Инстанс в статусе «${stateInstance}». Авторизуйте его в консоли GREEN-API.`)
-        return
+  const [state, action, pending] = useActionState(
+    async (_: State, form: FormData): Promise<State> => {
+      const field = (name: string) => String(form.get(name) ?? '').trim()
+      const creds: Credentials = {
+        idInstance: field('idInstance'),
+        apiTokenInstance: field('apiTokenInstance'),
+        apiUrl: field('apiUrl') || defaultApiUrl(field('idInstance')), // пустое поле — берём подсказку
       }
-      onLogin(creds)
-    } catch (err) {
-      setError(
-        err instanceof GreenApiError && err.status === 401
-          ? 'Неверный idInstance или apiTokenInstance'
-          : 'Не удалось подключиться к GREEN-API. Проверьте данные и apiUrl.',
-      )
-    } finally {
-      setBusy(false)
-    }
-  }
+      const fail = (error: string): State => ({ error, values: { ...creds, apiUrl: field('apiUrl') } })
+
+      if (!creds.idInstance || !creds.apiTokenInstance || !creds.apiUrl) return fail('Заполните все поля')
+      try {
+        const { stateInstance } = await createClient(creds).getStateInstance()
+        if (stateInstance !== 'authorized')
+          return fail(`Инстанс в статусе «${stateInstance}». Авторизуйте его в консоли GREEN-API.`)
+        onLogin(creds)
+        return { error: null, values: creds }
+      } catch (err) {
+        return fail(
+          err instanceof GreenApiError && err.status === 401
+            ? 'Неверный idInstance или apiTokenInstance'
+            : 'Не удалось подключиться к GREEN-API. Проверьте данные и apiUrl.',
+        )
+      }
+    },
+    { error: null, values: {} },
+  )
 
   return (
     <div className="login">
-      <form className="login__card" onSubmit={submit}>
+      <form className="login__card" action={action}>
         <div className="logo" aria-hidden />
         <h1>Вход в чат</h1>
         <p className="muted">Данные инстанса из консоли GREEN-API</p>
@@ -69,8 +64,7 @@ export function Login({ onLogin }: Props) {
             name="apiTokenInstance"
             type="password"
             autoComplete="off"
-            value={apiTokenInstance}
-            onChange={(e) => setToken(e.target.value)}
+            defaultValue={state.values.apiTokenInstance}
             placeholder="d75b3a66374942c5b3c019c698abc2067e151558acbd412345"
           />
         </label>
@@ -78,19 +72,15 @@ export function Login({ onLogin }: Props) {
           apiUrl
           <input
             name="apiUrl"
-            value={effectiveApiUrl}
-            onChange={(e) => {
-              setApiUrlTouched(true)
-              setApiUrl(e.target.value)
-            }}
-            placeholder="https://1101.api.green-api.com"
+            defaultValue={state.values.apiUrl}
+            placeholder={defaultApiUrl(idInstance) || 'https://1101.api.green-api.com'}
           />
         </label>
 
-        {error && <div className="error" role="alert">{error}</div>}
+        {state.error && <div className="error" role="alert">{state.error}</div>}
 
-        <button className="btn btn--primary" disabled={busy}>
-          {busy ? 'Проверяю…' : 'Войти'}
+        <button className="btn btn--primary" disabled={pending}>
+          {pending ? 'Проверяю…' : 'Войти'}
         </button>
       </form>
     </div>

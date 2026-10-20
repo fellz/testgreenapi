@@ -8,8 +8,9 @@
 
 ## Что умеет
 
-1. Вход по учётным данным инстанса: `idInstance`, `apiTokenInstance` (`apiUrl` подставляется из
-   первых 4 цифр `idInstance`, его можно поправить). Перед входом проверяется, что инстанс в статусе
+1. Вход по учётным данным инстанса: `idInstance`, `apiTokenInstance` (`apiUrl` можно не заполнять:
+   по умолчанию он вычисляется из первых 4 цифр `idInstance` и виден подсказкой в поле). Формы
+   сделаны на `useActionState` (React 19). Перед входом проверяется, что инстанс в статусе
    `authorized` ([GetStateInstance](https://green-api.com/telegram/docs/api/account/GetStateInstance/)).
 2. Новый чат по номеру телефона получателя. Telegram адресует чаты по `chatId`, поэтому номер
    сначала превращается в `chatId` через [CheckAccount](https://green-api.com/en/telegram/docs/api/service/CheckAccount/).
