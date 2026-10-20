@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type SubmitEvent } from 'react'
 import type { GreenApiClient } from '../api/greenApi'
 import { formatPhone, normalizePhone } from '../api/phone'
 import type { ChatsState } from '../state/chats'
@@ -100,7 +100,7 @@ function NewChat({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  async function submit(e: FormEvent) {
+  async function submit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault()
     const digits = normalizePhone(phone)
     if (!digits) {

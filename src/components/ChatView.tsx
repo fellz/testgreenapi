@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type SubmitEvent, type KeyboardEvent } from 'react'
 import type { MessageStatus } from '../api/notifications'
 import { formatPhone } from '../api/phone'
 import type { Chat } from '../state/chats'
@@ -26,7 +26,7 @@ export function ChatView({ chat, onSend, onBack }: Props) {
     inputRef.current?.focus()
   }, [chat.id])
 
-  function submit(e?: FormEvent) {
+  function submit(e?: SubmitEvent<HTMLFormElement>) {
     e?.preventDefault()
     const value = text.trim()
     if (!value) return

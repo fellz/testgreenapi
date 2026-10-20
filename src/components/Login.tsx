@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type SubmitEvent } from 'react'
 import { createClient, defaultApiUrl, GreenApiError, type Credentials } from '../api/greenApi'
 
 type Props = { onLogin: (creds: Credentials) => void }
@@ -13,7 +13,7 @@ export function Login({ onLogin }: Props) {
 
   const effectiveApiUrl = apiUrlTouched ? apiUrl : defaultApiUrl(idInstance)
 
-  async function submit(e: FormEvent) {
+  async function submit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault()
     const creds: Credentials = {
       idInstance: idInstance.trim(),
