@@ -1,11 +1,18 @@
 import { useActionState, useState } from 'react'
-import { createClient, defaultApiUrl, GreenApiError, type Credentials } from '../api/greenApi'
+import { checkCredentials } from '../api/flows'
+import { defaultApiUrl, type Credentials } from '../api/greenApi'
 
 type Props = { onLogin: (creds: Credentials) => void }
 
-// Результат попытки входа: ошибка + введённые значения. React 19 после action сбрасывает
-// неуправляемые поля формы к defaultValue — отдаём их обратно, чтобы при ошибке ничего не стёрлось.
-type State = { error: string | null; values: Partial<Credentials> }
+// React 19 после action сбрасывает неуправляемые поля к defaultValue — храним введённое
+// в state, чтобы при ошибке ничего не стёрлось.
+type State = { error: string | null; values: Credentials }
+
+const read = (form: FormData): Credentials => ({
+  idInstance: String(form.get('idInstance') ?? ''),
+  apiTokenInstance: String(form.get('apiTokenInstance') ?? ''),
+  apiUrl: String(form.get('apiUrl') ?? ''),
+})
 
 export function Login({ onLogin }: Props) {
   // единственное управляемое поле — от него зависит подсказка apiUrl
@@ -13,30 +20,12 @@ export function Login({ onLogin }: Props) {
 
   const [state, action, pending] = useActionState(
     async (_: State, form: FormData): Promise<State> => {
-      const field = (name: string) => String(form.get(name) ?? '').trim()
-      const creds: Credentials = {
-        idInstance: field('idInstance'),
-        apiTokenInstance: field('apiTokenInstance'),
-        apiUrl: field('apiUrl') || defaultApiUrl(field('idInstance')), // пустое поле — берём подсказку
-      }
-      const fail = (error: string): State => ({ error, values: { ...creds, apiUrl: field('apiUrl') } })
-
-      if (!creds.idInstance || !creds.apiTokenInstance || !creds.apiUrl) return fail('Заполните все поля')
-      try {
-        const { stateInstance } = await createClient(creds).getStateInstance()
-        if (stateInstance !== 'authorized')
-          return fail(`Инстанс в статусе «${stateInstance}». Авторизуйте его в консоли GREEN-API.`)
-        onLogin(creds)
-        return { error: null, values: creds }
-      } catch (err) {
-        return fail(
-          err instanceof GreenApiError && err.status === 401
-            ? 'Неверный idInstance или apiTokenInstance'
-            : 'Не удалось подключиться к GREEN-API. Проверьте данные и apiUrl.',
-        )
-      }
+      const values = read(form)
+      const res = await checkCredentials(values)
+      if (res.ok) onLogin(res.value)
+      return { error: res.ok ? null : res.error, values }
     },
-    { error: null, values: {} },
+    { error: null, values: read(new FormData()) },
   )
 
   return (

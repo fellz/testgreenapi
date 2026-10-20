@@ -1,6 +1,6 @@
 import { useActionState, useState } from 'react'
+import { findChatByPhone, type FoundChat } from '../api/flows'
 import type { GreenApiClient } from '../api/greenApi'
-import { formatPhone, normalizePhone } from '../api/phone'
 import type { ChatsState } from '../state/chats'
 import { Avatar } from './Avatar'
 import { formatTime } from './time'
@@ -42,9 +42,9 @@ export function Sidebar({ state, client, idInstance, online, onOpen, onSelect, o
       {adding && (
         <NewChat
           client={client}
-          onCreated={(id, title, phone) => {
+          onCreated={({ chatId, title, phone }) => {
             setAdding(false)
-            onOpen(id, title, phone)
+            onOpen(chatId, title, phone)
           }}
           onCancel={() => setAdding(false)}
         />
@@ -93,26 +93,16 @@ function NewChat({
   onCancel,
 }: {
   client: GreenApiClient
-  onCreated: (id: string, title: string, phone: string) => void
+  onCreated: (chat: FoundChat) => void
   onCancel: () => void
 }) {
   // phone возвращаем в state: после action React сбрасывает поле к defaultValue
   const [state, action, pending] = useActionState(
     async (_: { error: string | null; phone: string }, form: FormData) => {
       const phone = String(form.get('phone') ?? '')
-      const digits = normalizePhone(phone)
-      if (!digits) return { error: 'Введите номер в международном формате, например +7 999 123-45-67', phone }
-      try {
-        // Telegram адресует чаты по chatId, а не по номеру — получаем его через CheckAccount
-        const res = await client.checkAccount(Number(digits))
-        if (res.exist && res.chatId) {
-          onCreated(res.chatId, formatPhone(digits), digits)
-          return { error: null, phone: '' }
-        }
-        return { error: res.reason ?? 'У номера нет Telegram или он скрыт настройками приватности', phone }
-      } catch {
-        return { error: 'Не удалось проверить номер. Попробуйте ещё раз.', phone }
-      }
+      const res = await findChatByPhone(client, phone)
+      if (res.ok) onCreated(res.value)
+      return res.ok ? { error: null, phone: '' } : { error: res.error, phone }
     },
     { error: null, phone: '' },
   )

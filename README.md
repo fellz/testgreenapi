@@ -55,7 +55,7 @@ npm run dev          # http://127.0.0.1:5216
 ## Проверки
 
 ```bash
-npm test             # vitest: разбор уведомлений, редьюсер чатов, нормализация номера
+npm test             # vitest: сценарии форм, разбор уведомлений, редьюсер чатов, номер
 npm run lint         # oxlint
 npm run build        # tsc + vite build
 ```
@@ -75,6 +75,7 @@ node e2e/chat.mjs                            # нужен playwright (npm i -g p
 ```
 src/
   api/greenApi.ts         клиент: getStateInstance, checkAccount, sendMessage, receive/deleteNotification
+  api/flows.ts            сценарии форм без React: checkCredentials, findChatByPhone → Result
   api/notifications.ts    тело уведомления → событие чата (текст входящий/исходящий, статус)
   api/useNotifications.ts цикл long-poll с backoff при ошибках сети
   api/phone.ts            нормализация номера (+7 / 8 / пробелы → 79991234567)
