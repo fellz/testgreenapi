@@ -67,8 +67,13 @@ export function ChatView({ chat, onSend, onBack }: Props) {
                   {m.author}
                 </span>
               )}
-              <span className="msg__text">{m.text}</span>
+              {m.deleted ? (
+                <span className="msg__text msg__text--deleted">Сообщение удалено</span>
+              ) : (
+                <span className="msg__text">{m.text}</span>
+              )}
               <span className="msg__meta">
+                {m.edited && !m.deleted && 'изменено '}
                 {formatClock(m.timestamp)}
                 {m.direction === 'out' && <StatusIcon status={m.status} />}
               </span>

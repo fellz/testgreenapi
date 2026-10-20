@@ -109,6 +109,14 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.msg--in').length === 3)
   const authors = await page.locator('.msg__author').allTextContents()
   check('в группе показан автор, без повтора подряд', JSON.stringify(authors) === JSON.stringify(['Дима', 'Аня']), JSON.stringify(authors))
+  // 4c. правка и удаление: stanzaId указывает на исходное сообщение
+  const edit = (typeMessage, data) => push({ typeWebhook: 'incomingMessageReceived', timestamp: ts(), idMessage: `e-${receipt}`, senderData: { chatId: '-100777', chatType: 'group', sender: 'Дима', senderName: 'Дима' }, messageData: { typeMessage, ...data } })
+  edit('editedMessage', { editedMessageData: { stanzaId: 'g2', textMessage: 'Кто на созвоне в 15:00?' } })
+  edit('deletedMessage', { deletedMessageData: { stanzaId: 'g3' } })
+  await page.waitForSelector('.msg__text--deleted')
+  const texts = await page.locator('.msg--in .msg__text').allTextContents()
+  check('правка обновила текст, удалённое осталось с пометкой', JSON.stringify(texts) === JSON.stringify(['Всем привет', 'Кто на созвоне в 15:00?', 'Сообщение удалено']), JSON.stringify(texts))
+  check('у отредактированного пометка «изменено»', (await page.locator('.msg--in').nth(1).locator('.msg__meta').textContent()).includes('изменено'))
   await page.screenshot({ path: SHOTS + '4-group.png' })
   await page.click('.chat-item:has-text("Василий")')
 

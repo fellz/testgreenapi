@@ -1,5 +1,5 @@
 // Разбор тела уведомления из очереди GREEN-API в событие чата.
-// Нам нужны только текстовые сообщения (входящие и исходящие) и статусы исходящих —
+// Нам нужны только текстовые сообщения (входящие и исходящие), их правки/удаления и статусы исходящих —
 // всё остальное (стейт инстанса, медиа, звонки) возвращает null и просто удаляется из очереди.
 
 export type MessageStatus = 'pending' | 'sent' | 'delivered' | 'read' | 'failed'
@@ -11,11 +11,15 @@ export type Message = {
   author?: string // автор входящего в группе; в личном чате не нужен
   timestamp: number // unix, секунды
   status?: MessageStatus
+  edited?: boolean
+  deleted?: boolean // текст стёрт, в ленте остаётся пометка «Сообщение удалено»
 }
 
 export type ChatEvent =
   | { kind: 'message'; chatId: string; chatName?: string; message: Message }
   | { kind: 'status'; chatId: string; id: string; status: MessageStatus }
+  | { kind: 'edit'; chatId: string; id: string; text: string }
+  | { kind: 'delete'; chatId: string; id: string }
 
 type Raw = Record<string, any>
 
@@ -43,11 +47,27 @@ export function parseNotification(body: unknown): ChatEvent | null {
     case 'outgoingAPIMessageReceived': {
       // отправлено через API (эхо нашего же sendMessage)
       const chatId = b.senderData?.chatId
-      const text = textOf(b.messageData)
-      if (!chatId || text == null || !b.idMessage) return null
+      if (!chatId) return null
+
+      // правка и удаление приходят тем же типом уведомления; stanzaId — id исходного сообщения
+      const md = b.messageData
+      if (md?.typeMessage === 'editedMessage') {
+        const { stanzaId, textMessage } = md.editedMessageData ?? {}
+        return stanzaId && typeof textMessage === 'string'
+          ? { kind: 'edit', chatId: String(chatId), id: String(stanzaId), text: textMessage }
+          : null
+      }
+      if (md?.typeMessage === 'deletedMessage') {
+        const stanzaId = md.deletedMessageData?.stanzaId
+        return stanzaId ? { kind: 'delete', chatId: String(chatId), id: String(stanzaId) } : null
+      }
+
+      const text = textOf(md)
+      if (text == null || !b.idMessage) return null
       const incoming = b.typeWebhook === 'incomingMessageReceived'
       const sd = b.senderData
-      const group = sd.chatType === 'group' || String(chatId).startsWith('-')
+      // в Telegram группы приходят и как chatType "group", и как "channel"; id группы отрицательный
+      const group = sd.chatType === 'group' || sd.chatType === 'channel' || String(chatId).startsWith('-')
       return {
         kind: 'message',
         chatId: String(chatId),

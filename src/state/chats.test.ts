@@ -126,6 +126,43 @@ describe('chatsReducer', () => {
   })
 })
 
+describe('правка и удаление', () => {
+  const note = (typeWebhook: string, messageData: object) =>
+    parseNotification({ typeWebhook, idMessage: 'n', timestamp: 2, senderData: { chatId: '100' }, messageData })
+
+  it('разбор editedMessage / deletedMessage (примеры из доки), в т.ч. своих с телефона', () => {
+    expect(
+      note('incomingMessageReceived', {
+        typeMessage: 'editedMessage',
+        editedMessageData: { textMessage: 'Edited message', stanzaId: 'a' },
+      }),
+    ).toEqual({ kind: 'edit', chatId: '100', id: 'a', text: 'Edited message' })
+    expect(
+      note('outgoingMessageReceived', { typeMessage: 'deletedMessage', deletedMessageData: { stanzaId: 'a' } }),
+    ).toEqual({ kind: 'delete', chatId: '100', id: 'a' })
+  })
+
+  const opened = chatsReducer(emptyState, { type: 'open', id: '100', title: 'x' })
+  const withMsg = chatsReducer(opened, { type: 'event', event: incoming('a', 'старый текст') })
+
+  it('правка меняет текст и ставит пометку', () => {
+    const s = chatsReducer(withMsg, { type: 'event', event: { kind: 'edit', chatId: '100', id: 'a', text: 'новый' } })
+    expect(s.chats['100'].messages[0]).toMatchObject({ text: 'новый', edited: true })
+  })
+
+  it('удаление стирает текст, сообщение остаётся с пометкой; правка после удаления не воскрешает', () => {
+    let s = chatsReducer(withMsg, { type: 'event', event: { kind: 'delete', chatId: '100', id: 'a' } })
+    s = chatsReducer(s, { type: 'event', event: { kind: 'edit', chatId: '100', id: 'a', text: 'зомби' } })
+    expect(s.chats['100'].messages).toHaveLength(1)
+    expect(s.chats['100'].messages[0]).toMatchObject({ text: '', deleted: true })
+  })
+
+  it('удаление незнакомого сообщения не создаёт чат', () => {
+    const s = chatsReducer(emptyState, { type: 'event', event: { kind: 'delete', chatId: '999', id: 'z' } })
+    expect(s).toBe(emptyState)
+  })
+})
+
 describe('normalizePhone', () => {
   it.each([
     ['+7 (999) 123-45-67', '79991234567'],

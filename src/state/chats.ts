@@ -63,6 +63,19 @@ export function chatsReducer(state: ChatsState, action: ChatsAction): ChatsState
       const ev = action.event
       const existing = state.chats[ev.chatId]
 
+      if (ev.kind === 'edit' || ev.kind === 'delete') {
+        // правка/удаление сообщения, которого у нас нет (пришло до входа) — игнорируем
+        if (!existing?.messages.some((m) => m.id === ev.id)) return state
+        const messages = existing.messages.map((m) =>
+          m.id !== ev.id || m.deleted
+            ? m
+            : ev.kind === 'edit'
+              ? { ...m, text: ev.text, edited: true }
+              : { ...m, text: '', deleted: true },
+        )
+        return withChat(state, { ...existing, messages })
+      }
+
       if (ev.kind === 'status') {
         if (!existing) return state
         const messages = existing.messages.map((m) =>

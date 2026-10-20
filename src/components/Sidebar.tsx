@@ -73,7 +73,7 @@ export function Sidebar({ state, client, idInstance, online, onOpen, onSelect, o
                   </div>
                   <div className="chat-item__row">
                     <span className="chat-item__last">
-                      {last ? (last.direction === 'out' ? 'Вы: ' : last.author ? `${last.author}: ` : '') + last.text : 'Нет сообщений'}
+                      {last ? (last.direction === 'out' ? 'Вы: ' : last.author ? `${last.author}: ` : '') + (last.deleted ? 'Сообщение удалено' : last.text) : 'Нет сообщений'}
                     </span>
                     {chat.unread > 0 && <span className="badge">{chat.unread}</span>}
                   </div>
